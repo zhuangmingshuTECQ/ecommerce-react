@@ -21,7 +21,7 @@ const columns: GridColDef[] = [
   {
     field: 'unitPrice',
     headerName: 'Unit Price',
-    type: 'number',
+    type: 'currency',
     flex: 1,
   },
   { field: 'customerID', headerName: 'Customer ID', flex: 1, },
@@ -72,17 +72,6 @@ export default function TransactionTable() {
 
   return (
     <Box sx={{ height: '400px', width: '100%' }}>
-      <div>
-			<TextField id="exampleInput" label="Example input" variant="outlined" />
-      <Button
-        size="small"
-        variant="outlined"
-        // className={classes.textField}
-        // onClick={this.searchTitle}
-      >
-        Search
-      </Button>
-		</div>
       <DataGrid
         getRowId={(row: any) => row.description}
         rows={data ? data.invoices.map((x: any , index: any) => (
@@ -92,8 +81,8 @@ export default function TransactionTable() {
             stockCode: x.stockCode,
             description: x.description,
             quantity: x.quantity,
-            invoiceDate: format(new Date(x.invoiceDate.toString()),'dd-MMM-yy hh:mm a'),
-            unitPrice: x.unitPrice.toFixed(2),
+            invoiceDate: x ? format(new Date(x.invoiceDate.toString()),'dd-MMM-yy hh:mm a') : null,
+            unitPrice: '$'+x.unitPrice.toFixed(2),
             customerID: x.customerID,
             country: x.country,
           }
