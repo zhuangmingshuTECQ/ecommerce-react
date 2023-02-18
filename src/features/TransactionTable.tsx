@@ -1,19 +1,23 @@
 import React from 'react';
 import Box from '@mui/material/Box';
-import { DataGrid, GridColDef, GridValueGetterParams } from '@mui/x-data-grid';
-import { getTransactions, postCsv } from '../services/TransactionService';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Button, TextField } from '@mui/material';
+import { format } from 'date-fns';
 
 const columns: GridColDef[] = [
-  { field: 'invoiceNo', headerName: 'Invoice No', flex: 1, },
-  { field: 'stockCode', headerName: 'Stock Code', flex: 1, },
-  { field: 'description', headerName: 'Description', flex: 1, },
+  { field: 'invoiceNo', headerName: 'Invoice No', type: 'string', flex: 1, },
+  { field: 'stockCode', headerName: 'Stock Code', type: 'string',  flex: 1, },
+  { field: 'description', headerName: 'Description', type: 'string', flex: 2.5  , },
   {
     field: 'quantity',
     headerName: 'Quantity',
     type: 'number',
     flex: 1,
   },
-  { field: 'invoiceDate', headerName: 'Invoice Date', flex: 1, },
+  { field: 'invoiceDate', headerName: 'Invoice Date', flex: 1, minWidth: 160, },
   {
     field: 'unitPrice',
     headerName: 'Unit Price',
@@ -24,28 +28,89 @@ const columns: GridColDef[] = [
   { field: 'country', headerName: 'Country', flex: 1, },
 ];
 
+const fetchTransactions = async (page = 0) => {
+	const { data } = await axios.get('http://localhost:8080/transactions?page=' + page)
+  data.invoices[0].invoiceDate.toString()
+	return data;
+}
+
 export default function TransactionTable() {
-  const [data, setData] = React.useState([]);
   const [page, setPage] = React.useState(0);
   const [pageSize, setPageSize] = React.useState(30);
-  const [isLoading, setIsLoading] = React.useState(false);
 
+  const queryClient = useQueryClient()
+  
+  const { status, data, error, isFetching, isPreviousData } = useQuery({
+    queryKey: [ 'invoices',{page}],
+    queryFn: () =>fetchTransactions(page),
+    keepPreviousData: true,
+    staleTime: 5,
+  })
+
+  // Prefetch the next page
+  React.useEffect(() => {
+    if (!isPreviousData && data?.hasMore) {
+      queryClient.prefetchQuery({
+        queryKey: ['invoices', page + 1],
+        queryFn: () => fetchTransactions(page + 1),
+        initialData: () => fetchTransactions(1),
+      })
+    }
+  }, [data, isPreviousData, page, queryClient])
+
+  const [searchValue, setSearchValue] = React.useState()
+
+  // const getRequestParams = (page: number) => {
+  //   let params = {};
+
+  //   if (page) {
+  //     params['page'] = page
+  //   } 
+
+  //   return params;
+  // };
 
   return (
     <Box sx={{ height: '400px', width: '100%' }}>
+      <div>
+			<TextField id="exampleInput" label="Example input" variant="outlined" />
+      <Button
+        size="small"
+        variant="outlined"
+        // className={classes.textField}
+        // onClick={this.searchTitle}
+      >
+        Search
+      </Button>
+		</div>
       <DataGrid
-        rows={data}
-        rowCount={data.length}
-        loading={isLoading}
+        getRowId={(row: any) => row.description}
+        rows={data ? data.invoices.map((x: any , index: any) => (
+          {
+            id: index,
+            invoiceNo: x.invoiceNo,
+            stockCode: x.stockCode,
+            description: x.description,
+            quantity: x.quantity,
+            invoiceDate: format(new Date(x.invoiceDate.toString()),'dd-MMM-yy hh:mm a'),
+            unitPrice: x.unitPrice.toFixed(2),
+            customerID: x.customerID,
+            country: x.country,
+          }
+        )) : []}
+        loading={isFetching}
         pagination
         page={page}
-        pageSize={pageSize}
+        pageSize={pageSize} // todo allow selecting multiple sizes
         paginationMode="server"
+        rowCount={data ? data.totalElements : 0}
         rowsPerPageOptions={[30]}
         onPageChange={(newPage) => setPage(newPage)}
         onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
         columns={columns}
+        disableSelectionOnClick
       />
+      <ReactQueryDevtools initialIsOpen />
     </Box>
   );
 }
