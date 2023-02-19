@@ -1,12 +1,10 @@
-import React, { ChangeEvent } from 'react';
+import React from 'react';
 import Box from '@mui/material/Box';
-import { DataGrid, GridColDef, GridFilterModel, GridToolbar } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridFilterModel } from '@mui/x-data-grid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios, { AxiosRequestConfig } from 'axios';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { Button, IconButton, Stack, TextField } from '@mui/material';
 import { format } from 'date-fns';
-import SearchIcon from '@mui/icons-material/Search';
 import SearchBar from '../components/SearchBar';
 
 const columns: GridColDef[] = [
@@ -40,7 +38,7 @@ const fetchTransactions = async (params: any) => {
     }
   }
 	const { data } = await axios.get('http://localhost:8080/transactions', request)
-  data.invoices[0].invoiceDate.toString()
+
 	return data;
 }
 
@@ -50,7 +48,8 @@ export default function TransactionTable() {
   const [params, setParams] = React.useState({
     'page': page,
     'size': pageSize,
-    'query': ''
+    'query': '',
+    'filter':''
   })
 
   const queryClient = useQueryClient()
@@ -72,21 +71,29 @@ export default function TransactionTable() {
       })
     }
   }, [data, isPreviousData, page, queryClient, params])
-
-
-
-  const [queryOptions, setQueryOptions] = React.useState([{}]);
-
+ 
   const onFilterChange = React.useCallback((filterModel: GridFilterModel) => {
-    console.log('-------onFilterChange '+filterModel.items.map(x => x.toString()) +" ----"+filterModel.quickFilterValues)
-    setQueryOptions((prevData) => ([
-      ...prevData,
-      {
-        'operation': filterModel.linkOperator
+    // Here you save the data you need from the filter model
+    filterModel.items.forEach((item) => {
+      if (!item.columnField || !item.value || !item.operatorValue) {
+        return null;
       }
-    ]));
-  }, []);
-  
+      let operator: string
+      if (item.operatorValue === '%3C') {
+        operator = '<'
+      } else if (item.operatorValue === '%3E') {
+        operator = '>'
+      } else if (item.operatorValue === '%3D') {
+        operator = '='
+      }
+      setParams((prev) => ({
+        ...prev,
+        'filter': params.filter + "," + item.columnField+operator+item.value
+      }));
+    })
+  }, [params.filter]);
+
+
   const handleSearch = (searchTerm: string) => {
     if (searchTerm === '') {
 			return;
@@ -95,7 +102,6 @@ export default function TransactionTable() {
       ...prev,
       'query': searchTerm
     }));
-    
   }
 
   return (
@@ -122,7 +128,7 @@ export default function TransactionTable() {
         loading={isFetching}
         pagination
         page={page}
-        pageSize={pageSize} // todo allow selecting multiple sizes
+        pageSize={pageSize}
         paginationMode="server"
         rowCount={data ? data.totalElements : 0}
         rowsPerPageOptions={[30, 50, 100]}
@@ -141,7 +147,7 @@ export default function TransactionTable() {
           }));
         }}
         columns={columns}
-        filterMode="server"
+        filterMode='server'
         onFilterModelChange={onFilterChange}
         disableSelectionOnClick
         disableColumnSelector
